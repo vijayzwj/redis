@@ -1,0 +1,45 @@
+https://www.jianshu.com/p/bd7bf38d9b87
+
+
+我编写了一个脚本来批量迁移Slot
+
+
+#!/bin/bash
+source_host=$1  # 源节点HOST
+source_port=$2  # 源节点端口
+target_host=$3  # 目标节点HOST
+target_port=$4  # 目标节点端口
+start_slot=$5   # 迁移节点的其实范围
+end_slot=$6     # 迁移节点的结束范围
+
+
+for slot in `seq ${start_slot} ${end_slot}`
+do
+    redis-cli -c -h ${target_host} -p ${target_port} cluster setslot ${slot} importing `redis-cli -c -h ${source_host} -p ${source_port} cluster nodes | grep ${source_port} | awk '{print $1}'`
+    echo "Setslot importing ${slot} to ${target_host}:${target_port} success"
+    redis-cli -c -h ${source_host} -p ${source_port} cluster setslot ${slot} migrating `redis-cli -c -h ${target_host} -p ${target_port} cluster nodes | grep ${target_port} | awk '{print $1}'`
+    echo "Setslot migrating ${slot} from ${source_host}:${source_port} success"
+
+    while [ 1 -eq 1 ]
+    do
+        allkeys=`redis-cli -c -h ${source_host} -p ${source_port} cluster getkeysinslot ${slot} 10`
+        if [ -z "${allkeys}" ]
+        then
+            redis-cli -c -h ${source_host} -p ${source_port} cluster setslot ${slot} node `redis-cli -c -h ${target_host} -p ${target_port} cluster nodes | grep ${target_port} | awk '{print $1}'`
+            redis-cli -c -h ${target_host} -p ${target_port} cluster setslot ${slot} node `redis-cli -c -h ${source_host} -p ${target_port} cluster nodes | grep ${target_port} | awk '{print $1}'`
+            echo "Migrate slot ${slot} finish"
+            break
+        else 
+            for key in ${allkeys}
+            do
+                redis-cli -c -h ${source_host} -p ${source_port} migrate ${target_host} ${target_port} ${key} 0 5000
+                echo "Migrate slot ${slot} key ${key} success"
+            done
+        fi
+    done
+done
+
+bash rebalance-cluster.sh 10.211.55.4 7000 10.211.55.4 7006 0 1000
+
+将7000节点上0-1000这个范围内的Slot转移到7006节点，通过cluster nodes命令我们可以看到0-1000这个区间是slot已经从7000转移到7006
+

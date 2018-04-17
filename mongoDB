@@ -1,0 +1,283 @@
+./mongoexport -d test(数据库) -c t_user(集合) -o user.dat(输出)
+
+
+./mongoexport -d test -c students --csv -f classid,name,age -o students_csv.dat  
+
+
+原始频道，分析频道，标题，文章状态
+
+./mongoexport -h 192.168.6.34 -p 27017 -d browserdata -c online_article -f articleNo,originalSubject,subject,title,status -q "{'subject':{'$exists':'false'}}"  -o article.dat
+
+-h:指明数据库宿主机的IP
+-u:指明数据库的用户名
+-p:指明数据库的密码
+-d:指明数据库的名字
+-c:指明collection的名字
+-f:指明要导出那些列
+-o:指明到要导出的文件名
+-q:指明导出数据的过滤条件
+
+
+mvn clean && mvn -Dmaven.test.skip=true install
+
+
+
+
+./mongoimport -d test -c students students.dat 
+
+
+
+-h:指明数据库宿主机的IP
+-u:指明数据库的用户名
+-p:指明数据库的密码
+-d:指明数据库的名字
+-c:指明collection的名字
+-f:指明要导入那些列
+
+
+
+
+
+db.getCollection('vivo_article').aggregate([
+    {"$group" : {_id:{$substr :["$updateTime",0,10]}, count:{$sum:1}}}
+   
+])
+
+db.getCollection('vivo_article').aggregate([
+    { $match : { status:4,originalSubject:/.+/} },
+    {"$group" : {_id:{$dateToString: { format: "%Y-%m-%d", date: "$updateTime" }}, count:{$sum:1}}}])
+
+
+
+
+            map: function () {
+                    var key = {
+                        communityName: this.address.communityName,
+                        areaId: this.address.areaId
+                    };
+                    var value = {
+                        count: 1,
+                        create_date: this.create_date,
+                        update_date: this.update_date,
+                        areaName: this.address.areaName
+                    };
+                    emit(key, value);
+                   },
+	        reduce: function (key, values) {
+	            var result = {
+	                count: 0,
+	                latestUpdateDate: '',
+	                added: 0,
+	                updated: 0,
+	                areaName: values[0].areaName
+	            };
+	            for (var i = 0; i < values.length; i++) {
+	                //project count
+	                result.count += values[i].count;
+
+	                //latest update date
+	                if (!result.latestUpdateDate || values[i].update_date > result.latestUpdateDate) {
+	                    result.latestUpdateDate = values[i].update_date;
+	                }
+
+	                //added and updated
+	                var endDate = new Date(values[i].update_date);
+	                endDate.setDate(endDate.getDate() + 3);
+	                if (endDate.getTime() >= new Date().getTime()) {
+	                    if (values[i].update_date.getTime() == values[i].create_date.getTime()) {
+	                        result.added += 1;
+	                    } else {
+	                        result.updated += 1;
+	                    }
+	                }
+	            }
+	            return result;
+	        }
+	        OK，貌似搞定了，实则不然。因为有些小区恰好只有1个项目，这样的记录通过map函数之后就不会再经过reduce函数处理了，
+	        这样会导致最终返回的json数组中的对象属性不一致。因此我们还需要再过滤一下，以便得到结构一致的结果。
+
+
+
+./mongoexport -h 192.168.6.34 -p 27017 -d browserdata -c online_article -f articleNo,originalSubject,subject,title,status -q  '' -o article.dat
+
+
+DELETE
+FROM
+	vivo_save_stats
+WHERE
+	id IN (
+		SELECT
+			temp.id
+		FROM
+			(
+				SELECT
+					max(id) as id
+				FROM
+					vivo_save_stats
+				WHERE
+					create_time = '2017-07-14 08:00:00'
+				GROUP BY
+					`subject`
+				HAVING
+					COUNT(1) = 2
+			) as temp
+	)
+
+
+
+
+var map=function(){ return emit(this.sex,{names:[this.name]}) }
+var reduce=function(key,emits){ var ret=[];  emits.forEach(function(item){ ret=ret.concat(item.names);}); return {names:ret}; }
+db.runCommand({ mapreduce:"person", map:map, reduce:reduce, out:"names_result_mxx"})
+
+
+contains>>function (a, x)
+unique>>function (a)
+shuffle>>function (arr) 
+tojson>>function (a, indent, nolint) 
+fetchRefs>>function (arr, coll) 
+sum>>function (arr) 
+avg>>function (arr)
+stdDev>>function (arr) 
+
+
+./mongoexport -h 192.168.6.34 -p 27017  -d browserdata -c vivo_article  -q  '{status:3,$and:[{createTime:{$gt:ISODate("2017-07-16T16:00:00Z")}},{createTime:{$lt:ISODate("2017-07-28T17:00:00Z")}}]}' -o article_0718.dat
+
+
+
+`gmt_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '根据当前时间戳更新 \r\n',
+
+
+
+
+
+
+
+./mongoexport -d browserdata -c vivo_article -f articleNo,originalSubject,title,status -q  '{createTime:{$gt:ISODate("2017-07-07T00:00:00Z")}}' -o article_0708.dat
+
+
+
+
+
+
+var map=function(){ var dateKey = ""+this.createTime.getFullYear()+"-"+(this.createTime.getMonth()+1)+"-"+this.createTime.getDate();  return emit(dateKey,1)}
+
+
+var reduce=function(key,emits){ return Array.sum(emits) }
+
+
+db.runCommand({ mapreduce:"online_article",map:map, reduce:mapreduce, out:"time_tbl"})
+
+
+
+
+
+
+var map=function(){ 
+   var dateKey = this.createTime.getFullYear()+"-"+(this.createTime.getMonth()+1)+"-"+this.createTime.getDate(); 
+   var  hourKey=dateKey+" "+this.createTime.getHours(); 
+   var dateValue={info:{hourKey:hourKey,subject:this.originalSubject,count:1}}
+   return emit(dateKey,dateValue)
+ }
+
+
+var reduce=function(key,emits){
+    var ret={};
+    emits.forEach(function(item){
+          //对hourkey和subject进行分组累加统计
+          var  hourKey=item.info.hourKey;
+          var  subject=item.info.subject;
+          var  count=item.info.count;
+          var  key=hourKey+subject;
+          if(ret.hasOwnProperty(key)){
+               ret[key].count=ret[key].count+count;
+          }else{
+               ret[key]=item.info;
+          }
+
+    });
+    return {info:Object.values(ret)};
+}
+
+
+
+
+
+
+
+
+var map=function(){ 
+   var dateKey = this.createTime.getFullYear()+"-"+(this.createTime.getMonth()+1)+"-"+this.createTime.getDate(); 
+   var  hourKey=dateKey+" "+this.createTime.getHours(); 
+   var  emitKey={dateKey:dateKey,hourKey:hourKey,subject:this.originalSubject,status:this};
+   return emit(emitKey,1);
+ }
+var reduce=function(key,emits){
+   return Array.sum(emits);
+} 
+
+db.time_123.aggregate([{"$group" : {_id:"$_id.hourKey", count:{$sum:"$value"}}}]);
+
+
+
+
+
+
+
+
+
+
+
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.lang.reflect.Field;
+import java.util.concurrent.TimeUnit;
+
+import com.mongodb.*;
+import com.mongodb.client.MongoDriverInformation;
+import org.bson.BsonJavaScript;
+import org.bson.BsonString;
+import org.bson.Document;
+
+import com.mongodb.client.MapReduceIterable;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.MapReduceAction;
+
+public class MapReduce {
+
+    public static void main(String[] args) throws Exception {
+
+        String map = " function(){ var month=(this.createTime.getMonth()+1);  if(month<10){ month='0'+month;}  var dateKey = this.createTime.getFullYear()+'-'+month+'-'+this.createTime.getDate();     var  hourKey=dateKey+' '+this.createTime.getHours();     var  emitKey={dateKey:dateKey,hourKey:hourKey,subject:this.originalSubject,status:this.status+'' };    emit(emitKey,1);  } ";// loadScript("E:\\vivo_11068353\\workspace\\mongo_exe\\script\\map.txt");
+
+        String reduce = " function(key,emits){    return Array.sum(emits); } ";// loadScript("E:\\vivo_11068353\\workspace\\mongo_exe\\script\\reduce.txt");
+
+        String url = "mongodb://browserdata:browserdata@192.168.6.34:27017/browserdata";
+
+        MongoClientURI uri = new MongoClientURI(url);
+
+        MongoClient mongoClient = new MongoClient(uri);
+
+        MongoDatabase db = mongoClient.getDatabase("browserdata");
+
+        BasicDBObject bson = new BasicDBObject();
+
+        bson.append("mapReduce","vivo_article");
+        bson.append("map", map);
+        bson.append("reduce", reduce);
+        bson.append("out", "tbl_count");
+
+
+        Document doc = db.runCommand(bson);
+
+
+        System.out.println("doc = " + doc);
+
+      
+
+        mongoClient.close();
+    }
+
+
+
+}
